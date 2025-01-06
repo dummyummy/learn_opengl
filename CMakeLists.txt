@@ -14,7 +14,7 @@ set(GLAD_PATH ${CMAKE_SOURCE_DIR}/../glad)
 
 add_executable(learn_opengl main.cpp ${GLAD_PATH}/src/glad.c)
 
-target_include_directories(learn_opengl PRIVATE ${GLFW_PATH}/include PRIVATE ${GLAD_PATH}/include PRIVATE ${CMAKE_BINARY_DIR})
+target_include_directories(learn_opengl PRIVATE ${GLFW_PATH}/include PRIVATE ${GLAD_PATH}/include PRIVATE ${CMAKE_BINARY_DIR} PRIVATE ${CMAKE_SOURCE_DIR}/includes)
 
 target_link_directories(learn_opengl PRIVATE ${GLFW_PATH}/build/src)
 
