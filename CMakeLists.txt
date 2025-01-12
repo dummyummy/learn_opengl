@@ -11,6 +11,7 @@ configure_file(config.h.in config.h @ONLY)
 
 set(GLFW_PATH ${CMAKE_SOURCE_DIR}/lib/glfw)
 set(GLAD_PATH ${CMAKE_SOURCE_DIR}/lib/glad)
+set(ASSIMP_PATH ${CMAKE_SOURCE_DIR}/lib/assimp)
 
 set(IMGUI_PATH ${CMAKE_SOURCE_DIR}/lib/imgui)
 file(GLOB IMGUI_SOURCES "${IMGUI_PATH}/*.cpp")
@@ -22,6 +23,8 @@ add_executable(learn_opengl main.cpp ${GLAD_PATH}/src/glad.c ${IMGUI_SOURCES} ${
 target_include_directories(learn_opengl PRIVATE
     ${GLFW_PATH}/include
     ${GLAD_PATH}/include
+    ${ASSIMP_PATH}/include
+    ${ASSIMP_PATH}/build/include
     ${IMGUI_PATH}
     ${IMGUI_PATH}/backends
     ${IMGUI_PATH}/misc/cpp
@@ -29,9 +32,12 @@ target_include_directories(learn_opengl PRIVATE
     ${CMAKE_SOURCE_DIR}/includes
 )
 
-target_link_directories(learn_opengl PRIVATE ${GLFW_PATH}/build/src)
+target_link_directories(learn_opengl PRIVATE ${GLFW_PATH}/build/src ${ASSIMP_PATH}/build/bin)
 
-target_link_libraries(learn_opengl PRIVATE glfw3 opengl32)
+target_link_libraries(learn_opengl PRIVATE glfw3 opengl32 assimp-5)
 
 add_custom_command(TARGET learn_opengl POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${GLFW_PATH}/build/src/glfw3.dll" $<TARGET_FILE_DIR:learn_opengl>)
+
+add_custom_command(TARGET learn_opengl POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${ASSIMP_PATH}/build/bin/libassimp-5.dll" $<TARGET_FILE_DIR:learn_opengl>)
