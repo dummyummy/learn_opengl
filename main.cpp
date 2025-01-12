@@ -36,6 +36,8 @@ Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
+float near = 0.1f;
+float far = 100.0f;
 
 // timing
 float deltaTime = 0.0f;
@@ -96,16 +98,17 @@ int main()
 
     // build and compile shader
     // ------------------------
-    Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/multiple_lights_vert.glsl", CMAKE_SOURCE_DIR"/shaders/multiple_lights_frag.glsl");
+    // Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/multiple_lights_vert.glsl", CMAKE_SOURCE_DIR"/shaders/multiple_lights_frag.glsl");
     // Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/model_loading_vert.glsl", CMAKE_SOURCE_DIR"/shaders/model_loading_frag.glsl");
+    Shader depthShader(CMAKE_SOURCE_DIR"/shaders/depth_buffer_vert.glsl", CMAKE_SOURCE_DIR"/shaders/depth_buffer_frag.glsl");
 
     stbi_set_flip_vertically_on_load(false);
 
     // load models
     // -----------
-    // Model nanosuit(CMAKE_SOURCE_DIR"/resources/objects/nanosuit/nanosuit.obj");
+    Model nanosuit(CMAKE_SOURCE_DIR"/resources/objects/nanosuit/nanosuit.obj");
     // Model mars(CMAKE_SOURCE_DIR"/resources/objects/planet/planet.obj");
-    Model rock(CMAKE_SOURCE_DIR"/resources/objects/rock/rock.obj");
+    // Model rock(CMAKE_SOURCE_DIR"/resources/objects/rock/rock.obj");
 
     // transform properties
     float imgui_background_alpha = 0.5f;
@@ -155,6 +158,8 @@ int main()
         ImGui::SliderFloat("fov", &camera.Zoom, 1.0f, 89.0f, "%.1f");
         ImGui::InputFloat("cameraSpeed", &camera.MovementSpeed);
         ImGui::InputFloat("sensitivity", &camera.MouseSensitivity);
+        ImGui::SliderFloat("near", &near, 0.1f, 1.0f);
+        ImGui::SliderFloat("far", &far, 10.0f, 200.0f);
         ImGui::Text("Lighting");
         ImGui::SliderFloat("shininess", &shininess, 32.0f, 256.0f);
         ImGui::Text("Light");
@@ -183,55 +188,65 @@ int main()
         glm::mat4 view          = glm::mat4(1.0f);
         glm::mat4 projection    = glm::mat4(1.0f);
         view = camera.GetViewMatrix();
-        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / SCR_HEIGHT, near, far);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
         model = glm::scale(model, glm::vec3(scale));
         normalMatrix = glm::transpose(glm::inverse(model));
 
-        lightingShader.use();
-        lightingShader.setMat4("view", glm::value_ptr(view));
-        lightingShader.setMat4("projection", glm::value_ptr(projection));
-        lightingShader.setMat4("model", glm::value_ptr(model));
-        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        lightingShader.setFloat("material.shininess", shininess);
-        lightingShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
+        // lightingShader.use();
+        // lightingShader.setMat4("view", glm::value_ptr(view));
+        // lightingShader.setMat4("projection", glm::value_ptr(projection));
+        // lightingShader.setMat4("model", glm::value_ptr(model));
+        // lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        // lightingShader.setFloat("material.shininess", shininess);
+        // lightingShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
 
-        // directional light
-        lightingShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
-        lightingShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
-        lightingShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
-        lightingShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
-        // point light 1
-        lightingShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
-        lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setFloat("pointLights[0].constant", 1.0f);
-        lightingShader.setFloat("pointLights[0].linear", 0.09f);
-        lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // point light 2
-        lightingShader.setVec3("pointLights[1].position", glm::value_ptr(pointLightPositions[1]));
-        lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setFloat("pointLights[1].constant", 1.0f);
-        lightingShader.setFloat("pointLights[1].linear", 0.09f);
-        lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // spotLight
-        lightingShader.setVec3("spotLight.position", glm::value_ptr(camera.Position));
-        lightingShader.setVec3("spotLight.direction", glm::value_ptr(camera.Front));
-        lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-        lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setFloat("spotLight.constant", 1.0f);
-        lightingShader.setFloat("spotLight.linear", 0.09f);
-        lightingShader.setFloat("spotLight.quadratic", 0.032f);
-        lightingShader.setFloat("spotLight.innerCutOff", glm::cos(glm::radians(innerTheta)));
-        lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(innerTheta + thetaTransition)));  
+        // // directional light
+        // lightingShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
+        // lightingShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
+        // lightingShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
+        // lightingShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
+        // // point light 1
+        // lightingShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
+        // lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+        // lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        // lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        // lightingShader.setFloat("pointLights[0].constant", 1.0f);
+        // lightingShader.setFloat("pointLights[0].linear", 0.09f);
+        // lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
+        // // point light 2
+        // lightingShader.setVec3("pointLights[1].position", glm::value_ptr(pointLightPositions[1]));
+        // lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+        // lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+        // lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+        // lightingShader.setFloat("pointLights[1].constant", 1.0f);
+        // lightingShader.setFloat("pointLights[1].linear", 0.09f);
+        // lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
+        // // spotLight
+        // lightingShader.setVec3("spotLight.position", glm::value_ptr(camera.Position));
+        // lightingShader.setVec3("spotLight.direction", glm::value_ptr(camera.Front));
+        // lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+        // lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+        // lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+        // lightingShader.setFloat("spotLight.constant", 1.0f);
+        // lightingShader.setFloat("spotLight.linear", 0.09f);
+        // lightingShader.setFloat("spotLight.quadratic", 0.032f);
+        // lightingShader.setFloat("spotLight.innerCutOff", glm::cos(glm::radians(innerTheta)));
+        // lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(innerTheta + thetaTransition)));  
+
+        depthShader.use();
+        depthShader.setMat4("view", glm::value_ptr(view));
+        depthShader.setMat4("projection", glm::value_ptr(projection));
+        depthShader.setMat4("model", glm::value_ptr(model));
+        depthShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        depthShader.setFloat("near", near);
+        depthShader.setFloat("far", far);
 
         // nanosuit.Draw(lightingShader);
+        nanosuit.Draw(depthShader);
         // mars.Draw(lightingShader);
-        rock.Draw(lightingShader);
+        // rock.Draw(lightingShader);
+        // rock.Draw(depthShader);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
