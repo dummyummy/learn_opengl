@@ -92,15 +92,18 @@ int main()
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
     /***** create viewport *****/
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
     // build and compile shader
     // ------------------------
-    // Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/multiple_lights_vert.glsl", CMAKE_SOURCE_DIR"/shaders/multiple_lights_frag.glsl");
-    // Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/model_loading_vert.glsl", CMAKE_SOURCE_DIR"/shaders/model_loading_frag.glsl");
-    Shader depthShader(CMAKE_SOURCE_DIR"/shaders/depth_buffer_vert.glsl", CMAKE_SOURCE_DIR"/shaders/depth_buffer_frag.glsl");
+    Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/multiple_lights_vert.glsl", CMAKE_SOURCE_DIR"/shaders/multiple_lights_frag.glsl");
+    // Shader depthShader(CMAKE_SOURCE_DIR"/shaders/depth_buffer_vert.glsl", CMAKE_SOURCE_DIR"/shaders/depth_buffer_frag.glsl");
+    Shader silhoutteShader(CMAKE_SOURCE_DIR"/shaders/single_color_vert.glsl", CMAKE_SOURCE_DIR"/shaders/single_color_frag.glsl");
 
     stbi_set_flip_vertically_on_load(false);
 
@@ -127,6 +130,9 @@ int main()
         glm::vec3(0.7f, 0.2f, 2.0f),
         glm::vec3(2.3f, -3.3f, -4.0f),
     };
+    // silhoutte
+    glm::vec3 silhoutteColor(1.0f, 0.0f, 0.0f);
+    float silhoutteWidth = 0.05f;
     
     /***** render loop *****/
     while(!glfwWindowShouldClose(window))
@@ -174,6 +180,9 @@ int main()
             ImGui::Text("Point Light %d", i);
             ImGui::SliderFloat3(("position" + std::to_string(i)).c_str(), glm::value_ptr(pointLightPositions[i]), -10.0f, 10.0f, "%.2f");
         }
+        ImGui::Text("Silhoutte");
+        ImGui::ColorEdit3("color", glm::value_ptr(silhoutteColor));
+        ImGui::SliderFloat("width", &silhoutteWidth, 0.0f, 0.1f);
         ImGui::Text("Misc");
         ImGui::SliderFloat("gui_alpha", &imgui_background_alpha, 0.0f, 1.0f, "%.2f");
         ImGui::End();
@@ -181,7 +190,7 @@ int main()
         // render
         // ------
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // create transformations
         glm::mat4 model = glm::mat4(1.0f), normalMatrix;
@@ -193,57 +202,77 @@ int main()
         model = glm::scale(model, glm::vec3(scale));
         normalMatrix = glm::transpose(glm::inverse(model));
 
-        // lightingShader.use();
-        // lightingShader.setMat4("view", glm::value_ptr(view));
-        // lightingShader.setMat4("projection", glm::value_ptr(projection));
-        // lightingShader.setMat4("model", glm::value_ptr(model));
-        // lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        // lightingShader.setFloat("material.shininess", shininess);
-        // lightingShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
+        lightingShader.use();
+        lightingShader.setMat4("view", glm::value_ptr(view));
+        lightingShader.setMat4("projection", glm::value_ptr(projection));
+        lightingShader.setMat4("model", glm::value_ptr(model));
+        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        lightingShader.setFloat("material.shininess", shininess);
+        lightingShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
 
-        // // directional light
-        // lightingShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
-        // lightingShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
-        // lightingShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
-        // lightingShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
-        // // point light 1
-        // lightingShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
-        // lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        // lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        // lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-        // lightingShader.setFloat("pointLights[0].constant", 1.0f);
-        // lightingShader.setFloat("pointLights[0].linear", 0.09f);
-        // lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // // point light 2
-        // lightingShader.setVec3("pointLights[1].position", glm::value_ptr(pointLightPositions[1]));
-        // lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        // lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        // lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-        // lightingShader.setFloat("pointLights[1].constant", 1.0f);
-        // lightingShader.setFloat("pointLights[1].linear", 0.09f);
-        // lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // // spotLight
-        // lightingShader.setVec3("spotLight.position", glm::value_ptr(camera.Position));
-        // lightingShader.setVec3("spotLight.direction", glm::value_ptr(camera.Front));
-        // lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-        // lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-        // lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-        // lightingShader.setFloat("spotLight.constant", 1.0f);
-        // lightingShader.setFloat("spotLight.linear", 0.09f);
-        // lightingShader.setFloat("spotLight.quadratic", 0.032f);
-        // lightingShader.setFloat("spotLight.innerCutOff", glm::cos(glm::radians(innerTheta)));
-        // lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(innerTheta + thetaTransition)));  
+        // directional light
+        lightingShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
+        lightingShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
+        lightingShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
+        lightingShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
+        // point light 1
+        lightingShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
+        lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+        lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        lightingShader.setFloat("pointLights[0].constant", 1.0f);
+        lightingShader.setFloat("pointLights[0].linear", 0.09f);
+        lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
+        // point light 2
+        lightingShader.setVec3("pointLights[1].position", glm::value_ptr(pointLightPositions[1]));
+        lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+        lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+        lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+        lightingShader.setFloat("pointLights[1].constant", 1.0f);
+        lightingShader.setFloat("pointLights[1].linear", 0.09f);
+        lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
+        // spotLight
+        lightingShader.setVec3("spotLight.position", glm::value_ptr(camera.Position));
+        lightingShader.setVec3("spotLight.direction", glm::value_ptr(camera.Front));
+        lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+        lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+        lightingShader.setFloat("spotLight.constant", 1.0f);
+        lightingShader.setFloat("spotLight.linear", 0.09f);
+        lightingShader.setFloat("spotLight.quadratic", 0.032f);
+        lightingShader.setFloat("spotLight.innerCutOff", glm::cos(glm::radians(innerTheta)));
+        lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(innerTheta + thetaTransition)));  
 
-        depthShader.use();
-        depthShader.setMat4("view", glm::value_ptr(view));
-        depthShader.setMat4("projection", glm::value_ptr(projection));
-        depthShader.setMat4("model", glm::value_ptr(model));
-        depthShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        depthShader.setFloat("near", near);
-        depthShader.setFloat("far", far);
+        // depthShader.use();
+        // depthShader.setMat4("view", glm::value_ptr(view));
+        // depthShader.setMat4("projection", glm::value_ptr(projection));
+        // depthShader.setMat4("model", glm::value_ptr(model));
+        // depthShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        // depthShader.setFloat("near", near);
+        // depthShader.setFloat("far", far);
 
-        // nanosuit.Draw(lightingShader);
-        nanosuit.Draw(depthShader);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0xFF);
+        nanosuit.Draw(lightingShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        // model = glm::scale(model, glm::vec3(1 + silhoutteWidth));
+        model = glm::scale(model, glm::vec3(scale));
+        normalMatrix = glm::transpose(glm::inverse(model));
+        silhoutteShader.use();
+        silhoutteShader.setMat4("view", glm::value_ptr(view));
+        silhoutteShader.setMat4("projection", glm::value_ptr(projection));
+        silhoutteShader.setMat4("model", glm::value_ptr(model));
+        silhoutteShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        silhoutteShader.setVec3("color", glm::value_ptr(silhoutteColor));
+        silhoutteShader.setFloat("width", silhoutteWidth);
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glDisable(GL_DEPTH_TEST);
+        nanosuit.Draw(silhoutteShader);
+        glStencilMask(0xFF);
+        glEnable(GL_DEPTH_TEST);
         // mars.Draw(lightingShader);
         // rock.Draw(lightingShader);
         // rock.Draw(depthShader);
