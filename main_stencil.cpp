@@ -94,7 +94,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_STENCIL_TEST);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glStencilOp(GL_KEEP, GL_REPLACE, GL_REPLACE);
 
     /***** create viewport *****/
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -251,28 +251,53 @@ int main()
         // depthShader.setFloat("near", near);
         // depthShader.setFloat("far", far);
 
+        silhoutteShader.use();
+        silhoutteShader.setMat4("view", glm::value_ptr(view));
+        silhoutteShader.setMat4("projection", glm::value_ptr(projection));
+        silhoutteShader.setVec3("color", glm::value_ptr(silhoutteColor));
+        silhoutteShader.setFloat("width", silhoutteWidth);
+
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilMask(0xFF);
+        lightingShader.use();
         nanosuit.Draw(lightingShader);
-
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glDisable(GL_DEPTH_TEST);
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
         // model = glm::scale(model, glm::vec3(1 + silhoutteWidth));
         model = glm::scale(model, glm::vec3(scale));
         normalMatrix = glm::transpose(glm::inverse(model));
         silhoutteShader.use();
-        silhoutteShader.setMat4("view", glm::value_ptr(view));
-        silhoutteShader.setMat4("projection", glm::value_ptr(projection));
         silhoutteShader.setMat4("model", glm::value_ptr(model));
         silhoutteShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        silhoutteShader.setVec3("color", glm::value_ptr(silhoutteColor));
-        silhoutteShader.setFloat("width", silhoutteWidth);
-        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-        glStencilMask(0x00);
-        glDisable(GL_DEPTH_TEST);
         nanosuit.Draw(silhoutteShader);
         glStencilMask(0xFF);
         glEnable(GL_DEPTH_TEST);
+
+        // glClear(GL_STENCIL_BUFFER_BIT);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.0f, 0.0f, -2.0f));
+        model = glm::scale(model, glm::vec3(scale));
+        normalMatrix = glm::transpose(glm::inverse(model));
+        lightingShader.use();
+        lightingShader.setMat4("model", glm::value_ptr(model));
+        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        glStencilFunc(GL_ALWAYS, 2, 0xFF);
+        glStencilMask(0xFF);
+        nanosuit.Draw(lightingShader);
+        glStencilFunc(GL_NOTEQUAL, 2, 0xFF);
+        glStencilMask(0x00);
+        glDisable(GL_DEPTH_TEST);
+        silhoutteShader.use();
+        silhoutteShader.setMat4("model", glm::value_ptr(model));
+        silhoutteShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        nanosuit.Draw(silhoutteShader);
+        glStencilMask(0xFF);
+        glEnable(GL_DEPTH_TEST);
+
         // mars.Draw(lightingShader);
         // rock.Draw(lightingShader);
         // rock.Draw(depthShader);
