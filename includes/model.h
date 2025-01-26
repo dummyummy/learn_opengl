@@ -121,6 +121,10 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
                                                                  aiTextureType_SPECULAR, 
                                                                  "texture_specular");
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+        std::vector<Texture> reflectMaps = loadMaterialTextures(material, 
+                                                                aiTextureType_AMBIENT, 
+                                                                "texture_reflect");
+        textures.insert(textures.end(), reflectMaps.begin(), reflectMaps.end());
     }
 
     return Mesh(vertices, indices, textures);
@@ -165,7 +169,7 @@ void Model::Draw(Shader &shader)
 
 unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma)
 {
-    
+    stbi_set_flip_vertically_on_load(true);
     std::string filename = std::string(path);
     filename = directory + '/' + filename;
 

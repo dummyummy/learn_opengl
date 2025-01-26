@@ -18,7 +18,7 @@ file(GLOB IMGUI_SOURCES "${IMGUI_PATH}/*.cpp")
 set(IMGUI_BACKENDS "${IMGUI_PATH}/backends/imgui_impl_glfw.cpp" "${IMGUI_PATH}/backends/imgui_impl_opengl3.cpp")
 set(IMGUI_MISC "${IMGUI_PATH}/misc/cpp/imgui_stdlib.cpp")
 
-add_executable(learn_opengl mains/main_framebuffer.cpp ${GLAD_PATH}/src/glad.c ${IMGUI_SOURCES} ${IMGUI_BACKENDS} ${IMGUI_MISC})
+add_executable(learn_opengl mains/main_skybox.cpp ${GLAD_PATH}/src/glad.c ${IMGUI_SOURCES} ${IMGUI_BACKENDS} ${IMGUI_MISC})
 
 target_include_directories(learn_opengl PRIVATE
     ${GLFW_PATH}/include
