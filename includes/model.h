@@ -25,10 +25,10 @@ public:
         loadModel(path);
     }
     void Draw(Shader &shader);
+    std::vector<Mesh> meshes;
 private:
     /*  模型数据  */
     std::vector<Texture> textures_loaded;
-    std::vector<Mesh> meshes;
     std::string directory;
     /*  函数   */
     void loadModel(std::string path);
