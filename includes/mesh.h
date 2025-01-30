@@ -35,6 +35,7 @@ public:
     std::vector<Texture> textures;
     Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures);
     void Draw(Shader &shader);
+    void DrawInstanced(Shader &shader, int amount);
     unsigned int getVAO() const { return VAO; }
 private:
     unsigned int VAO, VBO, EBO;
@@ -98,6 +99,34 @@ void Mesh::Draw(Shader &shader)
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void Mesh::DrawInstanced(Shader &shader, int amount)
+{
+    using namespace std;
+    unsigned int diffuseNr = 1;
+    unsigned int specularNr = 1;
+    unsigned int reflectNr = 1;
+    for (unsigned int i = 0; i < textures.size(); i++)
+    {
+        glActiveTexture(GL_TEXTURE0 + i);
+        string number;
+        string name = textures[i].type;
+        if (name == "texture_diffuse")
+            number = to_string(diffuseNr++);
+        else if (name == "texture_specular")
+            number = to_string(specularNr++);
+        else if (name == "texture_reflect")
+            number = to_string(reflectNr++);
+        
+        shader.setInt(("material." + name + number).c_str(), i);
+        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    }
+    glActiveTexture(GL_TEXTURE0);
+
+    glBindVertexArray(VAO);
+    glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, amount);
     glBindVertexArray(0);
 }
 

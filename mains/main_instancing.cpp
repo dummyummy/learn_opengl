@@ -168,7 +168,7 @@ int main()
     Model planet(CMAKE_SOURCE_DIR"/resources/objects/planet/planet.obj");
     Model rock(CMAKE_SOURCE_DIR"/resources/objects/rock/rock.obj");
 
-    constexpr unsigned int amount = 10000;
+    constexpr unsigned int amount = 1000;
     glm::mat4 *modelMatrices, *normalMatrices;
     modelMatrices = new glm::mat4[amount];
     normalMatrices = new glm::mat4[amount];
@@ -391,11 +391,7 @@ int main()
 
         // planet.Draw(instancingShader);
 
-        for (const auto &mesh : rock.meshes)
-        {
-            glBindVertexArray(mesh.getVAO());
-            glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0, amount);
-        }
+        rock.DrawInstanced(instancingShader, amount);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

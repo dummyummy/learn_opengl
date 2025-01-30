@@ -25,6 +25,7 @@ public:
         loadModel(path);
     }
     void Draw(Shader &shader);
+    void DrawInstanced(Shader &shader, int amount);
     std::vector<Mesh> meshes;
 private:
     /*  模型数据  */
@@ -165,6 +166,12 @@ void Model::Draw(Shader &shader)
 {
     for(unsigned int i = 0; i < meshes.size(); i++)
         meshes[i].Draw(shader);
+}
+
+void Model::DrawInstanced(Shader &shader, int amount)
+{
+    for(unsigned int i = 0; i < meshes.size(); i++)
+        meshes[i].DrawInstanced(shader, amount);
 }
 
 unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma)
