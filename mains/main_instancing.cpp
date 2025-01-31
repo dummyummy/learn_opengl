@@ -107,8 +107,8 @@ int main()
     // ------------------------
     Shader instancingShader(CMAKE_SOURCE_DIR"/shaders/instancing/instancing_vert.glsl",
                             CMAKE_SOURCE_DIR"/shaders/instancing/instancing_frag.glsl");
-    Shader phongShader(CMAKE_SOURCE_DIR"/shaders/instancing/phong_vert.glsl",
-                       CMAKE_SOURCE_DIR"/shaders/instancing/phong_frag.glsl");
+    Shader phongShader(CMAKE_SOURCE_DIR"/shaders/phong_vert.glsl",
+                       CMAKE_SOURCE_DIR"/shaders/phong_frag.glsl");
 
     float cubeVertices[] = {
         // positions          // normals           // texture coords
