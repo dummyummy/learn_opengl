@@ -29,10 +29,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 void init_imgui(GLFWwindow *window);
 unsigned int loadTexture(char const * path);
+unsigned int loadCubemap(std::vector<std::string> faces);
 
 // settings
 const unsigned int SCR_WIDTH = 1000;
 const unsigned int SCR_HEIGHT = 750;
+const unsigned int msaa = 8;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -65,6 +67,7 @@ int main()
 #ifdef __APPLE
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+    glfwWindowHint(GLFW_SAMPLES, 8);
 
     // glfw window creation
     // --------------------
@@ -98,25 +101,19 @@ int main()
     glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_MULTISAMPLE);
 
     /***** create viewport *****/
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
     // build and compile shader
     // ------------------------
-    // Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/multiple_lights_vert.glsl", CMAKE_SOURCE_DIR"/shaders/multiple_lights_frag.glsl");
-    Shader lightingShader(CMAKE_SOURCE_DIR"/shaders/alpha_blend_lighting_vert.glsl", CMAKE_SOURCE_DIR"/shaders/alpha_blend_lighting_frag.glsl");
-    Shader shader(CMAKE_SOURCE_DIR"/shaders/alpha_blend_vert.glsl", CMAKE_SOURCE_DIR"/shaders/alpha_blend_frag.glsl");
-    lightingShader.use();
-    lightingShader.setInt("material.texture_diffuse1", 0);
+    Shader phongShader(CMAKE_SOURCE_DIR"/shaders/blinn_phong_vert.glsl", CMAKE_SOURCE_DIR"/shaders/blinn_phong_frag.glsl");
+    Shader screenShader(CMAKE_SOURCE_DIR"/shaders/post_processing/screen_vert.glsl", CMAKE_SOURCE_DIR"/shaders/post_processing/screen_frag.glsl");
+    phongShader.use();
+    phongShader.setInt("material.texture_diffuse1", 0);
 
-    stbi_set_flip_vertically_on_load(true);
-
-    // load models
-    // -----------
-    // Model nanosuit(CMAKE_SOURCE_DIR"/resources/objects/nanosuit/nanosuit.obj");
-    // Model mars(CMAKE_SOURCE_DIR"/resources/objects/planet/planet.obj");
-    // Model rock(CMAKE_SOURCE_DIR"/resources/objects/rock/rock.obj");
+    auto tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/wood.png");
 
     float cubeVertices[] = {
         // positions          // normals           // texture coords
@@ -162,25 +159,16 @@ int main()
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
     };
-    float planeVertices[] = {
-        // positions          // texture Coords 
-         5.0f, -0.5f,  5.0f, 0.0f, 1.0f, 0.0f, 2.0f, 0.0f,
-        -5.0f, -0.5f,  5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 2.0f,
+    
+    float quadVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+        // positions   // texCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
 
-         5.0f, -0.5f,  5.0f, 0.0f, 1.0f, 0.0f, 2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 2.0f,
-         5.0f, -0.5f, -5.0f, 0.0f, 1.0f, 0.0f, 2.0f, 2.0f
-    };
-    float transparentVertices[] = {
-        // positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
-        0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  1.0f,
-        0.0f, -0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  0.0f,
-        1.0f, -0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 1.0f,  0.0f,
-
-        0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  1.0f,
-        1.0f, -0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 1.0f,  0.0f,
-        1.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 1.0f,  1.0f
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
     };
     
     // cube VAO
@@ -196,54 +184,63 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    // plane VAO
-    unsigned int planeVAO, planeVBO;
-    glGenVertexArrays(1, &planeVAO);
-    glGenBuffers(1, &planeVBO);
-    glBindVertexArray(planeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+    // setup screen VAO
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    // transparent VAO
-    unsigned int transparentVAO, transparentVBO;
-    glGenVertexArrays(1, &transparentVAO);
-    glGenBuffers(1, &transparentVBO);
-    glBindVertexArray(transparentVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glBindVertexArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     
-    // load textures
-    // -------------
-    unsigned int cubeTexture = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/marble.jpg");
-    unsigned int floorTexture = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/metal.png");
-    unsigned int transparentTexture = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/window.png");
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    unsigned int textureColorBufferMultiSampled;
+    glGenTextures(1, &textureColorBufferMultiSampled);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, msaa, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled, 0);
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, msaa, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // configure second post-processing framebuffer
+    unsigned int intermediateFBO;
+    glGenFramebuffers(1, &intermediateFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+    // create a color attachment texture
+    unsigned int screenTexture;
+    glGenTextures(1, &screenTexture);
+    glBindTexture(GL_TEXTURE_2D, screenTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);	// we only need a color buffer
 
-    // transparent vegetation locations
-    // --------------------------------
-    std::vector<glm::vec3> vegetation 
-    {
-        glm::vec3(-1.5f, 0.0f, -0.48f),
-        glm::vec3( 1.5f, 0.0f, 0.51f),
-        glm::vec3( 0.0f, 0.0f, 0.7f),
-        glm::vec3(-0.3f, 0.0f, -2.3f),
-        glm::vec3(0.5f, 0.0f, -0.6f)
-    };
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // transform properties
     float imgui_background_alpha = 0.5f;
 
+    // material properties
+    float ratio = 1.52f;
     // model transformation
-    float scale = 0.2f;
+    float scale = 0.5f;
     // lighting properties
     float shininess = 32.0f;
     // light properties
@@ -251,11 +248,16 @@ int main()
     glm::vec3 lightAmbient(0.2f, 0.2f, 0.2f);
     glm::vec3 lightDiffuse(0.8, 0.8f, 0.8f);
     glm::vec3 lightSpecular(1.0f, 1.0f, 1.0f);
+    glm::vec3 clearColor(0.1f, 0.1f, 0.1f);
     float innerTheta = 12.5f, thetaTransition = 5.0f;
     glm::vec3 pointLightPositions[] = {
         glm::vec3(0.7f, 0.2f, 2.0f),
         glm::vec3(2.3f, -3.3f, -4.0f),
     };
+    // post processing
+    bool postProcessing = false;
+    float offsetScale = 0.005f;
+    float offsetFreq = 20.0f;
     
     /***** render loop *****/
     while(!glfwWindowShouldClose(window))
@@ -278,8 +280,10 @@ int main()
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Appearing);
         ImGui::SetNextWindowSize(ImVec2(250, SCR_HEIGHT), ImGuiCond_Appearing);
         ImGui::Begin("Properties"); // Create a window and append into it.
+        ImGui::Text("Material");
+        ImGui::SliderFloat("ratio", &ratio, 1.0f, 2.0f);
         ImGui::Text("Model");
-        ImGui::SliderFloat("scale", &scale, 0.1f, 2.0f);
+        ImGui::SliderFloat("scale", &scale, 0.1f, 20.0f);
         ImGui::Text("Camera");
         ImGui::SliderFloat3("cameraPos", glm::value_ptr(camera.Position), -10.0f, 10.0f, "%.1f");
         if (ImGui::SliderFloat3("cameraFront", glm::value_ptr(camera.Front), -1.0f, 1.0f, "%.2f"))
@@ -290,7 +294,7 @@ int main()
         ImGui::SliderFloat("near", &near, 0.1f, 1.0f);
         ImGui::SliderFloat("far", &far, 10.0f, 200.0f);
         ImGui::Text("Lighting");
-        ImGui::SliderFloat("shininess", &shininess, 32.0f, 256.0f);
+        ImGui::SliderFloat("shininess", &shininess, 1.0f, 100.0f);
         ImGui::Text("Light");
         ImGui::SliderFloat3("lightDir", glm::value_ptr(lightDir), -1.0f, 1.0f, "%.2f");
         ImGui::ColorEdit3("lightAmbient", glm::value_ptr(lightAmbient));
@@ -298,18 +302,25 @@ int main()
         ImGui::ColorEdit3("lightSpecular", glm::value_ptr(lightSpecular));
         ImGui::SliderFloat("innerTheta", &innerTheta, 0.1f, 90.0f);
         ImGui::SliderFloat("thetaTransition", &thetaTransition, 0.0f, 30.0f);
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 1; i++)
         {
             ImGui::Text("Point Light %d", i);
             ImGui::SliderFloat3(("position" + std::to_string(i)).c_str(), glm::value_ptr(pointLightPositions[i]), -10.0f, 10.0f, "%.2f");
         }
         ImGui::Text("Misc");
         ImGui::SliderFloat("gui_alpha", &imgui_background_alpha, 0.0f, 1.0f, "%.2f");
+        ImGui::ColorEdit3("clearColor", glm::value_ptr(clearColor));
+        ImGui::Text("Misc");
+        ImGui::Checkbox("postProcessing", &postProcessing);
+        ImGui::DragFloat("offsetScale", &offsetScale, 0.001f);
+        ImGui::DragFloat("offsetFreq", &offsetFreq, 0.1f);
         ImGui::End();
 
         // render
         // ------
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        // pass 1
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glClearColor(clearColor.x, clearColor.y, clearColor.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // create transformations
@@ -319,77 +330,51 @@ int main()
         view = camera.GetViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / SCR_HEIGHT, near, far);
 
-        lightingShader.use();
-        lightingShader.setMat4("view", glm::value_ptr(view));
-        lightingShader.setMat4("projection", glm::value_ptr(projection));
-        lightingShader.setFloat("material.shininess", shininess);
-        lightingShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
+        phongShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(scale));
+        normalMatrix = glm::transpose(glm::inverse(model));
+        phongShader.setMat4("view", glm::value_ptr(view));
+        phongShader.setMat4("projection", glm::value_ptr(projection));
+        phongShader.setMat4("model", glm::value_ptr(model));
+        phongShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        phongShader.setFloat("material.shininess", shininess);
+        phongShader.setVec3("viewPos",  glm::value_ptr(camera.Position));
 
         // directional light
-        lightingShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
-        lightingShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
-        lightingShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
-        lightingShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
+        phongShader.setVec3("dirLight.direction", glm::value_ptr(lightDir));
+        phongShader.setVec3("dirLight.ambient", glm::value_ptr(lightAmbient));
+        phongShader.setVec3("dirLight.diffuse", glm::value_ptr(lightDiffuse));
+        phongShader.setVec3("dirLight.specular", glm::value_ptr(lightSpecular));
         // point light 1
-        lightingShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
-        lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setFloat("pointLights[0].constant", 1.0f);
-        lightingShader.setFloat("pointLights[0].linear", 0.09f);
-        lightingShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // point light 2
-        lightingShader.setVec3("pointLights[1].position", glm::value_ptr(pointLightPositions[1]));
-        lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setFloat("pointLights[1].constant", 1.0f);
-        lightingShader.setFloat("pointLights[1].linear", 0.09f);
-        lightingShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // cubes
+        phongShader.setVec3("pointLights[0].position", glm::value_ptr(pointLightPositions[0]));
+        phongShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+        phongShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        phongShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        phongShader.setFloat("pointLights[0].constant", 1.0f);
+        phongShader.setFloat("pointLights[0].linear", 0.09f);
+        phongShader.setFloat("pointLights[0].quadratic", 0.032f);
+
         glBindVertexArray(cubeVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cubeTexture);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-        normalMatrix = glm::transpose(glm::inverse(model));
-        lightingShader.setMat4("model", glm::value_ptr(model));
-        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+        glBindTexture(GL_TEXTURE_2D, tex);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
-        normalMatrix = glm::transpose(glm::inverse(model));
-        lightingShader.setMat4("model", glm::value_ptr(model));
-        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        // floor
-        glBindVertexArray(planeVAO);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        model = glm::mat4(1.0f);
-        normalMatrix = glm::transpose(glm::inverse(model));
-        lightingShader.setMat4("model", glm::value_ptr(model));
-        lightingShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
-        glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        shader.use();
-        shader.setMat4("view", glm::value_ptr(view));
-        shader.setMat4("projection", glm::value_ptr(projection));
-        // vegetation
-        std::map<float, glm::vec3> sorted;
-        for (unsigned int i = 0; i < vegetation.size(); i++)
-        {
-            float distance = glm::length(camera.Position - vegetation[i]);
-            sorted[distance] = vegetation[i];
-        }
-        glBindVertexArray(transparentVAO);
-        glBindTexture(GL_TEXTURE_2D, transparentTexture);
-        for (decltype(sorted.rbegin()) it = sorted.rbegin(); it != sorted.rend(); it++)
-        {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, it->second);
-            shader.setMat4("model", glm::value_ptr(model));
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
+        glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        screenShader.use();
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, screenTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glEnable(GL_DEPTH_TEST);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -487,6 +472,7 @@ void init_imgui(GLFWwindow *window)
 // ---------------------------------------------------
 unsigned int loadTexture(char const * path)
 {
+    stbi_set_flip_vertically_on_load(true);
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
@@ -518,6 +504,39 @@ unsigned int loadTexture(char const * path)
         std::cout << "Texture failed to load at path: " << path << std::endl;
         stbi_image_free(data);
     }
+
+    return textureID;
+}
+
+unsigned int loadCubemap(std::vector<std::string> faces)
+{
+    stbi_set_flip_vertically_on_load(false);
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 
+                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
 }
