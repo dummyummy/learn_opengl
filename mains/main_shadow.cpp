@@ -37,7 +37,7 @@ const unsigned int SCR_HEIGHT = 750;
 const unsigned int msaa = 8;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 2.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -287,7 +287,7 @@ int main()
     // material properties
     float ratio = 1.52f;
     // model transformation
-    float scale = 10.0f;
+    float scale = 3.0f;
     // lighting properties
     float shininess = 128.0f;
     // light properties
@@ -299,7 +299,7 @@ int main()
     glm::vec3 lightAttenuation(1.0f, 0.09f, 0.032f);
     float innerTheta = 12.5f, thetaTransition = 5.0f;
     glm::vec3 pointLightPositions[] = {
-        glm::vec3(0.7f, 0.2f, 2.0f),
+        glm::vec3(0.0f, 2.0f, 0.0f),
         glm::vec3(2.3f, -3.3f, -4.0f),
     };
     // post processing
@@ -370,9 +370,9 @@ int main()
 
         glm::mat4 model = glm::mat4(1.0f), normalMatrix;
         // shadow mapping settings
-        float near_plane = 1.0f, far_plane = 20.0f;
-        glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
-        glm::mat4 lightView = glm::lookAt(-3.0f * glm::normalize(lightDir), glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        float near_plane = 1.0f, far_plane = 100.0f;
+        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 lightView = glm::lookAt(-10.0f * glm::normalize(lightDir), glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
         depthShader.use();
@@ -382,16 +382,30 @@ int main()
         glClear(GL_DEPTH_BUFFER_BIT);
         {
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
             model = glm::scale(model, glm::vec3(scale));
             depthShader.setMat4("model", glm::value_ptr(model));
             glBindVertexArray(planeVAO);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, wood_tex);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            // plane 2
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, scale, -scale));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(scale));
+            depthShader.setMat4("model", glm::value_ptr(model));
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // plane 3
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(scale, scale, 0.0f));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, glm::vec3(scale));
+            depthShader.setMat4("model", glm::value_ptr(model));
+            glDrawArrays(GL_TRIANGLES, 0, 6);
 
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(-2.0f, -0.5f, 0.5f));
+            model = glm::translate(model, glm::vec3(-2.0f, 0.5f, 0.5f));
             model = glm::scale(model, glm::vec3(1.0f));
             depthShader.setMat4("model", glm::value_ptr(model));
             glBindVertexArray(cubeVAO);
@@ -400,7 +414,7 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(1.0f, 0.2f, -1.0f));
+            model = glm::translate(model, glm::vec3(1.0f, 1.2f, -1.0f));
             model = glm::rotate(model, glm::radians(45.0f), glm::vec3(1.0f, 1.0f, 1.0f));
             model = glm::scale(model, glm::vec3(1.0f));
             depthShader.setMat4("model", glm::value_ptr(model));
@@ -450,7 +464,7 @@ int main()
         glBindTexture(GL_TEXTURE_2D, depthMap);
         {
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
             model = glm::scale(model, glm::vec3(scale));
             normalMatrix = glm::transpose(glm::inverse(model));
             blinnShader.setMat4("model", glm::value_ptr(model));
@@ -459,9 +473,27 @@ int main()
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, wood_tex);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            // plane 2
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, scale, -scale));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(scale));
+            normalMatrix = glm::transpose(glm::inverse(model));
+            blinnShader.setMat4("model", glm::value_ptr(model));
+            blinnShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // plane 3
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(scale, scale, 0.0f));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, glm::vec3(scale));
+            normalMatrix = glm::transpose(glm::inverse(model));
+            blinnShader.setMat4("model", glm::value_ptr(model));
+            blinnShader.setMat4("normalMatrix", glm::value_ptr(normalMatrix));
+            glDrawArrays(GL_TRIANGLES, 0, 6);
 
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(-2.0f, -0.5f, 0.5f));
+            model = glm::translate(model, glm::vec3(-2.0f, 0.5f, 0.5f));
             model = glm::scale(model, glm::vec3(1.0f));
             normalMatrix = glm::transpose(glm::inverse(model));
             blinnShader.setMat4("model", glm::value_ptr(model));
@@ -472,7 +504,7 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 36);
 
             model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(1.0f, 0.2f, -1.0f));
+            model = glm::translate(model, glm::vec3(1.0f, 1.2f, -1.0f));
             model = glm::rotate(model, glm::radians(45.0f), glm::vec3(1.0f, 1.0f, 1.0f));
             model = glm::scale(model, glm::vec3(1.0f));
             normalMatrix = glm::transpose(glm::inverse(model));

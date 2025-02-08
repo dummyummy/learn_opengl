@@ -111,7 +111,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
     vec3 ambient = light.ambient * albedo;
     vec3 diffuse = light.diffuse * diff * albedo;
     vec3 specular = light.specular * spec;
-    float bias = max(0.02 * (1.0 - dot(normal, lightDir)), 0.002);
+    float bias = max(0.002 * (1.0 - dot(normal, lightDir)), 0.001);
     float shadow = ShadowCalculation(fs_in.FragSpaceLightPos, bias);
     return (ambient + (diffuse + specular) * (1.0 - shadow));
 }
