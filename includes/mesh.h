@@ -7,9 +7,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "shader.h"
+#include "default_textures.h"
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 #define MAX_BONE_INFLUENCE 4
 
@@ -18,6 +20,8 @@ struct Vertex
     glm::vec3 Position;
     glm::vec3 Normal;
     glm::vec2 TexCoords;
+    glm::vec3 Tangent;
+    glm::vec3 Bitangent;
 };
 
 struct Texture
@@ -48,6 +52,8 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std:
     this->indices = indices;
     this->textures = textures;
 
+    DefaultTextures::init();
+
     setupMesh();
 }
 
@@ -70,6 +76,10 @@ void Mesh::setupMesh()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal)); // normal
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords)); // uv
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Tangent)); // normal
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Bitangent)); // uv
 
     glBindVertexArray(0);
 }
@@ -80,6 +90,7 @@ void Mesh::Draw(Shader &shader)
     unsigned int diffuseNr = 1;
     unsigned int specularNr = 1;
     unsigned int reflectNr = 1;
+    unsigned int normalNr = 1;
     for (unsigned int i = 0; i < textures.size(); i++)
     {
         glActiveTexture(GL_TEXTURE0 + i);
@@ -91,9 +102,40 @@ void Mesh::Draw(Shader &shader)
             number = to_string(specularNr++);
         else if (name == "texture_reflect")
             number = to_string(reflectNr++);
+        else if (name == "texture_normal")
+            number = to_string(normalNr++);
         
         shader.setInt(("material." + name + number).c_str(), i);
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    }
+    unsigned int noneNr = textures.size();
+    if (diffuseNr == 1)
+    {
+        glActiveTexture(GL_TEXTURE0 + noneNr);
+        shader.setInt("material.texture_diffuse1", noneNr);
+        glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::WHITE]);
+        noneNr++;
+    }
+    if (specularNr == 1)
+    {
+        glActiveTexture(GL_TEXTURE0 + noneNr);
+        shader.setInt("material.texture_specular1", noneNr);
+        glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLACK]);
+        noneNr++;
+    }
+    if (reflectNr == 1)
+    {
+        glActiveTexture(GL_TEXTURE0 + noneNr);
+        shader.setInt("material.texture_reflect1", noneNr);
+        glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLACK]);
+        noneNr++;
+    }
+    if (normalNr == 1)
+    {
+        glActiveTexture(GL_TEXTURE0 + noneNr);
+        shader.setInt("material.texture_normal1", noneNr);
+        glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLUE]);
+        noneNr++;
     }
     glActiveTexture(GL_TEXTURE0);
 
@@ -108,6 +150,7 @@ void Mesh::DrawInstanced(Shader &shader, int amount)
     unsigned int diffuseNr = 1;
     unsigned int specularNr = 1;
     unsigned int reflectNr = 1;
+    unsigned int normalNr = 1;
     for (unsigned int i = 0; i < textures.size(); i++)
     {
         glActiveTexture(GL_TEXTURE0 + i);
@@ -119,6 +162,8 @@ void Mesh::DrawInstanced(Shader &shader, int amount)
             number = to_string(specularNr++);
         else if (name == "texture_reflect")
             number = to_string(reflectNr++);
+        else if (name == "texture_normal")
+            number = to_string(normalNr++);
         
         shader.setInt(("material." + name + number).c_str(), i);
         glBindTexture(GL_TEXTURE_2D, textures[i].id);

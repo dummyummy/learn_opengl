@@ -43,7 +43,7 @@ void Model::loadModel(std::string path)
 {
     Assimp::Importer import;
     // const aiScene *scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);    
-    const aiScene *scene = import.ReadFile(path, aiProcess_Triangulate);    
+    const aiScene *scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);    
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
@@ -101,6 +101,22 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
         else
             vertex.TexCoords = glm::vec2(0.0f, 0.0f);
 
+        if (mesh->mTangents)
+        {
+            vector.x = mesh->mTangents[i].x;
+            vector.y = mesh->mTangents[i].y;
+            vector.z = mesh->mTangents[i].z;
+            vector = glm::normalize(vector - glm::dot(vertex.Normal, vector) * vertex.Normal);
+            vertex.Tangent = vector;
+            // Gram-Schmidt process
+            vertex.Bitangent = glm::normalize(glm::cross(vertex.Normal, vertex.Tangent));
+        }
+        else
+        {
+            vertex.Tangent = glm::vec3(0.0f, 0.0f, 0.0f);
+            vertex.Bitangent = glm::vec3(0.0f, 0.0f, 0.0f);
+        }
+
         vertices.push_back(vertex);
     }
 
@@ -126,6 +142,10 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
                                                                 aiTextureType_AMBIENT, 
                                                                 "texture_reflect");
         textures.insert(textures.end(), reflectMaps.begin(), reflectMaps.end());
+        std::vector<Texture> normalMaps = loadMaterialTextures(material, 
+                                                               aiTextureType_HEIGHT, 
+                                                               "texture_normal");
+        textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
     }
 
     return Mesh(vertices, indices, textures);
@@ -176,7 +196,7 @@ void Model::DrawInstanced(Shader &shader, int amount)
 
 unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma)
 {
-    stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(false);
     std::string filename = std::string(path);
     filename = directory + '/' + filename;
 
