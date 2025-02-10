@@ -77,9 +77,9 @@ void Mesh::setupMesh()
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords)); // uv
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Tangent)); // normal
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Tangent)); // T
     glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Bitangent)); // uv
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Bitangent)); // B
 
     glBindVertexArray(0);
 }
@@ -91,6 +91,7 @@ void Mesh::Draw(Shader &shader)
     unsigned int specularNr = 1;
     unsigned int reflectNr = 1;
     unsigned int normalNr = 1;
+    unsigned int heightNr = 1;
     for (unsigned int i = 0; i < textures.size(); i++)
     {
         glActiveTexture(GL_TEXTURE0 + i);
@@ -104,6 +105,8 @@ void Mesh::Draw(Shader &shader)
             number = to_string(reflectNr++);
         else if (name == "texture_normal")
             number = to_string(normalNr++);
+        else if (name == "texture_height")
+            number = to_string(heightNr++);
         
         shader.setInt(("material." + name + number).c_str(), i);
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
@@ -135,6 +138,13 @@ void Mesh::Draw(Shader &shader)
         glActiveTexture(GL_TEXTURE0 + noneNr);
         shader.setInt("material.texture_normal1", noneNr);
         glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLUE]);
+        noneNr++;
+    }
+    if (heightNr == 1)
+    {
+        glActiveTexture(GL_TEXTURE0 + noneNr);
+        shader.setInt("material.texture_height1", noneNr);
+        glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLACK]);
         noneNr++;
     }
     glActiveTexture(GL_TEXTURE0);

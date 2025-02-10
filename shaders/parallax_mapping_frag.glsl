@@ -6,6 +6,7 @@ struct Material {
     sampler2D texture_specular1;
     sampler2D texture_reflect1;
     sampler2D texture_normal1;
+    sampler2D texture_height1;
     float shininess;
 }; 
 
@@ -46,11 +47,13 @@ uniform sampler2D dirShadowMap;
 uniform samplerCube pointShadowMap;
 
 uniform float far_plane;
-uniform float bumpiness;
+uniform float bumpScale;
+uniform float heightScale;
 
 // function prototypes
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir);
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec2 texCoords);
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec2 texCoords);
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTangentSpace);
 
 uniform float gamma;
 
@@ -109,11 +112,16 @@ float DirShadowCalculation(vec4 fragPosLightSpace, float bias, int pcf_radius = 
 void main()
 {    
     // properties
-    vec3 tNormal = texture(material.texture_normal1, fs_in.TexCoords).rgb;
-    tNormal = normalize(tNormal * 2.0 - 1.0);
-    tNormal = normalize(vec3(tNormal.xy * bumpiness, tNormal.z));
-    vec3 normal = normalize(fs_in.TBN * tNormal);
+    mat3 worldToTangent = transpose(fs_in.TBN);
     vec3 viewDir = normalize(viewPos - fs_in.FragPos);
+    vec3 viewDirTangentSpace = normalize(worldToTangent * viewDir);
+    vec2 texCoords = ParallaxMapping(fs_in.TexCoords, viewDirTangentSpace);
+    if(texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
+        discard;
+    vec3 tNormal = texture(material.texture_normal1, texCoords).rgb;
+    tNormal = normalize(tNormal * 2.0 - 1.0);
+    tNormal = normalize(vec3(tNormal.xy * bumpScale, tNormal.z));
+    vec3 normal = normalize(fs_in.TBN * tNormal);
     
     // == =====================================================
     // Our lighting is set up in 3 phases: directional, point lights and an optional flashlight
@@ -123,16 +131,16 @@ void main()
     // == =====================================================
     // phase 1: directional lighting
     vec3 result = vec3(0.0);
-    result += CalcDirLight(dirLight, normal, viewDir);
+    result += CalcDirLight(dirLight, normal, viewDir, texCoords);
     // phase 2: point lights
     for(int i = 0; i < NR_POINT_LIGHTS; i++)
-        result += CalcPointLight(pointLights[i], normal, fs_in.FragPos, viewDir);    
+        result += CalcPointLight(pointLights[i], normal, fs_in.FragPos, viewDir, texCoords);
     
     FragColor = vec4(pow(result, vec3(1 / gamma)), 1.0);
 }
 
 // calculates the color when using a directional light.
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec2 texCoords)
 {
     vec3 lightDir = normalize(-light.direction);
     // diffuse shading
@@ -142,8 +150,8 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
     float spec = pow(max(dot(halfwayVector, normal), 0.0), material.shininess);
     // combine results
 
-    vec3 albedo = pow(vec3(texture(material.texture_diffuse1, fs_in.TexCoords)), vec3(gamma));
-    vec3 smoothness = pow(vec3(texture(material.texture_specular1, fs_in.TexCoords)), vec3(gamma));
+    vec3 albedo = pow(vec3(texture(material.texture_diffuse1, texCoords)), vec3(gamma));
+    vec3 smoothness = pow(vec3(texture(material.texture_specular1, texCoords)), vec3(gamma));
 
     vec3 ambient = light.ambient * albedo;
     vec3 diffuse = light.diffuse * diff * albedo;
@@ -154,7 +162,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
 }
 
 // calculates the color when using a point light.
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec2 texCoords)
 {
     vec3 lightDir = normalize(light.position - fragPos);
     // diffuse shading
@@ -166,8 +174,8 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
 
-    vec3 albedo = pow(vec3(texture(material.texture_diffuse1, fs_in.TexCoords)), vec3(gamma));
-    vec3 smoothness = pow(vec3(texture(material.texture_specular1, fs_in.TexCoords)), vec3(gamma));
+    vec3 albedo = pow(vec3(texture(material.texture_diffuse1, texCoords)), vec3(gamma));
+    vec3 smoothness = pow(vec3(texture(material.texture_specular1, texCoords)), vec3(gamma));
 
     // combine results
     vec3 ambient = light.ambient * albedo;
@@ -180,4 +188,30 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     float bias = max(0.02 * (1.0 - dot(normal, lightDir)), 0.01);
     float shadow = PointShadowCalculation(fs_in.FragPos, bias);
     return (ambient + (diffuse + specular) * (1.0 - shadow));
+}
+
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTangentSpace)
+{
+    const float numLayers = 30;
+    float layerDepth = 1.0 / numLayers;
+    float currentLayerDepth = 0.0;
+    vec2 P = viewDirTangentSpace.xy / clamp(viewDirTangentSpace.z, 0.1, 1.0) * heightScale;
+    vec2 deltaTexCoords = P / numLayers;
+    vec2 currentTexCoords = texCoords;
+    float currentDepthMapValue = texture(material.texture_height1, currentTexCoords).r;
+    while (currentLayerDepth < currentDepthMapValue)
+    {
+        currentTexCoords -= deltaTexCoords;
+        currentDepthMapValue = texture(material.texture_height1, currentTexCoords).r;
+        currentLayerDepth += layerDepth;
+    }
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    float afterDepth = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture(material.texture_height1, prevTexCoords).r - currentLayerDepth + layerDepth;
+
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = currentTexCoords * (1.0 - weight) + prevTexCoords * weight;
+    
+    return finalTexCoords;
 }

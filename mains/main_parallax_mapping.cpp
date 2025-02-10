@@ -111,7 +111,7 @@ int main()
 
     // build and compile shader
     // ------------------------
-    Shader blinnShader(CMAKE_SOURCE_DIR"/shaders/normal_mapping_vert.glsl", CMAKE_SOURCE_DIR"/shaders/normal_mapping_frag.glsl");
+    Shader blinnShader(CMAKE_SOURCE_DIR"/shaders/parallax_mapping_vert.glsl", CMAKE_SOURCE_DIR"/shaders/parallax_mapping_frag.glsl");
     Shader screenShader(CMAKE_SOURCE_DIR"/shaders/post_processing/screen_vert.glsl", CMAKE_SOURCE_DIR"/shaders/post_processing/screen_frag.glsl");
     Shader dirDepthShader(CMAKE_SOURCE_DIR"/shaders/shadow_mapping/light_depth_vert.glsl",
                           CMAKE_SOURCE_DIR"/shaders/shadow_mapping/light_depth_frag.glsl");
@@ -126,6 +126,7 @@ int main()
     auto brickwall_tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/bricks2.jpg");
     auto block_tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/block_solid.png");
     auto brick_normal = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/bricks2_normal.jpg");
+    auto brick_disp = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/bricks2_disp.jpg");
     
     float quadVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
         // positions   // texCoords
@@ -263,7 +264,8 @@ int main()
 
     // material properties
     float ratio = 1.52f;
-    float bumpiness = 1.0f;
+    float bumpScale = 1.0f;
+    float heightScale = 0.2f;
     // model transformation
     float scale = 3.0f;
     // lighting properties
@@ -312,7 +314,8 @@ int main()
         ImGui::SliderFloat("ratio", &ratio, 1.0f, 2.0f);
         ImGui::Text("Model");
         ImGui::SliderFloat("scale", &scale, 0.1f, 20.0f);
-        ImGui::DragFloat("bumpiness", &bumpiness, 0.01f, -5.0f, 5.0f);
+        ImGui::DragFloat("bumpScale", &bumpScale, 0.01f, -5.0f, 5.0f);
+        ImGui::DragFloat("heightScale", &heightScale, 0.01f, -5.0f, 5.0f);
         ImGui::Text("Camera");
         ImGui::SliderFloat3("cameraPos", glm::value_ptr(camera.Position), -10.0f, 10.0f, "%.1f");
         if (ImGui::SliderFloat3("cameraFront", glm::value_ptr(camera.Front), -1.0f, 1.0f, "%.2f"))
@@ -461,7 +464,8 @@ int main()
 
         blinnShader.setMat4("lightSpaceMatrix", glm::value_ptr(lightSpaceMatrix));
         blinnShader.setFloat("far_plane", point_far_plane);
-        blinnShader.setFloat("bumpiness", bumpiness);
+        blinnShader.setFloat("bumpScale", bumpScale);
+        blinnShader.setFloat("heightScale", heightScale);
 
         blinnShader.setFloat("gamma", gamma);
         blinnShader.setMat4("view", glm::value_ptr(view));
@@ -483,15 +487,16 @@ int main()
         blinnShader.setFloat("pointLights[0].linear", lightAttenuation.y);
         blinnShader.setFloat("pointLights[0].quadratic", lightAttenuation.z);
 
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, depthMap);
-        glActiveTexture(GL_TEXTURE5);
         blinnShader.setInt("material.texture_diffuse1", 0);
         blinnShader.setInt("material.texture_specular1", 1);
         blinnShader.setInt("material.texture_reflect1", 2);
         blinnShader.setInt("material.texture_normal1", 3);
-        blinnShader.setInt("dirShadowMap", 4);
-        blinnShader.setInt("pointShadowMap", 5);
+        blinnShader.setInt("material.texture_height1", 4);
+        blinnShader.setInt("dirShadowMap", 5);
+        blinnShader.setInt("pointShadowMap", 6);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
         {
             model = glm::mat4(1.0f);
@@ -509,6 +514,8 @@ int main()
             glBindTexture(GL_TEXTURE_2D, DefaultTextures::textures[DefaultTextures::TextureType::BLACK]);
             glActiveTexture(GL_TEXTURE3);
             glBindTexture(GL_TEXTURE_2D, brick_normal);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, brick_disp);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             // plane 2
             model = glm::mat4(1.0f);
