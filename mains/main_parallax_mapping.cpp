@@ -123,9 +123,9 @@ int main()
 
     DefaultTextures::init();
 
-    auto brickwall_tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/toy_box_diffuse.png");
+    auto brickwall_tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/bricks2.jpg");
     auto block_tex = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/block_solid.png");
-    auto brick_normal = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/toy_box_normal.png");
+    auto brick_normal = loadTexture(CMAKE_SOURCE_DIR"/resources/textures/bricks2_normal.jpg");
     
     float quadVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
         // positions   // texCoords
@@ -661,7 +661,7 @@ void init_imgui(GLFWwindow *window)
 // ---------------------------------------------------
 unsigned int loadTexture(char const * path)
 {
-    stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(false);
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
