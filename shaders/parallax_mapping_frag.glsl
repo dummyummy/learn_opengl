@@ -192,7 +192,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, v
 
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDirTangentSpace)
 {
-    const float numLayers = 30;
+    const float numLayers = 50;
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
     vec2 P = viewDirTangentSpace.xy / clamp(viewDirTangentSpace.z, 0.1, 1.0) * heightScale;
